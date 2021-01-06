@@ -1,11 +1,10 @@
-#revisione del 6 aprile 2020: sostituito il codice che utilizza mutate_
 #23 febbraio 2018: cerca i file prodotti dai controlli spaziali (n+numerocodice+.txt)
 #e applica i codici per invalidare i dati invalidi trovati dai controlli spazili (per la temperatura)
 #I file originali con i flag vengono salvati in una sotto-directory
+#6 gennaio 2021: eliminata dipendenza da lazyeval
 rm(list=objects())
 library("tidyverse")
 library("purrr")
-library("lazyeval")
 library("stringr")
 options(error=recover,warn=2)
 
@@ -28,12 +27,14 @@ invalidaFlag<-function(param){
   
   function(x){
     
-    #mutate_(x,.dots=setNames(list(interp(~(ifelse(y!=0 | z!=0,NA,x)),.values=list(x=as.name(param),y=as.name(corName),z=as.name(regName)))),param))
-    names(x)<-stringr::str_replace(names(x),param,"XXX")
-    mutate(x,XXX=ifelse((regression.XXX | corroboration.XXX) !=0,NA,XXX))->x
-    names(x)<-stringr::str_replace(names(x),"XXX",param)
+    which(x[[corName]]==1)->rigaCor
+    if(length(rigaCor)) x[rigaCor,param]<-NA
+    
+    which(x[[regName]]==1)->rigaReg
+    if(length(rigaReg)) x[rigaReg,param]<-NA
+    
     x
-
+    
   }
   
 }#fine invalida flag
@@ -44,11 +45,11 @@ invalidaTmin<-invalidaFlag(param="tmin")
 applicaFlag<-function(nomeFile)
 {
   
-  tryCatch({
-    suppressWarnings(read_delim(nomeFile,delim=",",col_names=TRUE,col_types ="iiiddddddd"))
-  },error=function(e){
-    stop(sprintf("Errore lettura file %s",nomeFile))
-  })->dati
+  read_delim(nomeFile,delim=",",col_names=TRUE,
+             col_types =cols(year=col_integer(),
+                             month=col_integer(),
+                             day=col_integer(),
+                             .default = col_double()))->dati
   
   dati %>% 
     invalidaTmax %>%
